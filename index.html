@@ -9,7 +9,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; direction: rtl; }
     .container { max-width: 600px; margin: 0 auto; padding-bottom: 80px; }
-    .lock-btn { position: fixed; bottom: 25px; left: 25px; background: rgba(102,126,234,0.9); border: none; color: white; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .lock-btn { position: fixed; bottom: 25px; right: 25px; background: rgba(102,126,234,0.9); border: none; color: white; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
     .card { background: white; border-radius: 15px; padding: 25px 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
     h1 { color: #333; text-align: center; margin-bottom: 8px; font-size: 26px; }
     .subtitle { text-align: center; color: #666; margin-bottom: 25px; font-size: 14px; }
@@ -29,11 +29,12 @@
     label { display: block; color: #333; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
     input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 16px; direction: rtl; }
     input:focus { outline: none; border-color: #667eea; }
-    .submit-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: 20px; }
-    .submit-btn:active { opacity: 0.9; }
+    .submit-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: 20px; transition: opacity 0.2s; }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .message { padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 14px; }
     .error { background: #ffebee; color: #d32f2f; border: 1px solid #ef5350; }
     .success { background: #e8f5e9; color: #2e7d32; border: 1px solid #66bb6a; }
+    .warning { background: #fff8e1; color: #f57f17; border: 1px solid #ffca28; }
     .message.show { display: block; }
     .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; }
     .modal.show { display: flex; }
@@ -52,8 +53,10 @@
     .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .modal-btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
     .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-    .btn-secondary { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
+    .btn-danger { background: #d32f2f; color: white; }
     .empty-msg { color: #999; text-align: center; font-size: 13px; padding: 20px; }
+    .firebase-status { font-size: 11px; text-align: center; color: #999; margin-top: 15px; }
+    .firebase-status.error { color: #d32f2f; }
   </style>
 </head>
 <body>
@@ -65,6 +68,7 @@
     <div id="soldOutBanner" class="sold-out-banner">סוגרים מכירות! 🎊<br>כל 90 כרטיסים נמכרו</div>
     <div id="formArea">
       <div id="errorMsg" class="message error"></div>
+      <div id="warningMsg" class="message warning"></div>
       <div id="successMsg" class="message success"></div>
       <div class="tickets-container">
         <div class="ticket-box">
@@ -96,9 +100,11 @@
         <input type="tel" id="phoneInput" placeholder="0501234567">
       </div>
       <button class="submit-btn" onclick="buyTickets()" id="buyBtn">בחר כרטיסים</button>
+      <div id="firebaseStatus" class="firebase-status"></div>
     </div>
   </div>
 </div>
+
 <div id="adminModal" class="modal">
   <div class="modal-box">
     <div class="modal-header">
@@ -117,33 +123,60 @@
     </div>
     <div class="modal-actions">
       <button class="modal-btn btn-primary" onclick="downloadExcel()">📊 הורד Excel</button>
-      <button class="modal-btn btn-secondary" onclick="resetAll()">🔄 איפוס</button>
+      <button class="modal-btn btn-danger" onclick="resetAll()">🔄 איפוס</button>
     </div>
   </div>
 </div>
+
 <script>
-const ADMIN_PASSWORD = '8074345Nw!';
+// Bug fix #5: Password stored as SHA-256 hash, not plaintext
+const ADMIN_HASH = 'c6f236269de81742fe4f77bfd80acf7f24c31b39e264720be5324e4a8d0e27c9';
 const MAX_TICKETS = 90;
 const FIREBASE_URL = 'https://lanedefense-analytics-default-rtdb.firebaseio.com/party-tickets';
+
 let data = { qtyDrinks: 0, qtyEntry: 0, registrations: [] };
+let isSubmitting = false;
 
-async function init() { await loadData(); updateUI(); }
+// Hash function using Web Crypto API
+async function hashPassword(pwd) {
+  const msgBuffer = new TextEncoder().encode(pwd);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
+async function init() {
+  await loadData();
+  updateUI();
+}
+
+// Bug fix #7: Show clear Firebase status to admin
 async function loadData() {
   try {
     const res = await fetch(`${FIREBASE_URL}/registrations.json`);
-    if (res.ok) data.registrations = await res.json() || [];
+    if (!res.ok) throw new Error('Firebase error');
+    const raw = await res.json();
+    // Firebase POST stores as object with keys, convert to array
+    data.registrations = raw ? Object.values(raw) : [];
+    document.getElementById('firebaseStatus').textContent = '';
+    document.getElementById('firebaseStatus').className = 'firebase-status';
   } catch (e) {
+    document.getElementById('firebaseStatus').textContent = '⚠️ בעיה בחיבור לשרת - נסה לרענן';
+    document.getElementById('firebaseStatus').className = 'firebase-status error';
     const stored = localStorage.getItem('tickets');
     if (stored) data.registrations = JSON.parse(stored);
   }
 }
 
-async function saveData() {
-  localStorage.setItem('tickets', JSON.stringify(data.registrations));
-  try {
-    await fetch(`${FIREBASE_URL}/registrations.json`, { method: 'PUT', body: JSON.stringify(data.registrations) });
-  } catch (e) {}
+// Bug fix #4: Use POST (atomic append) instead of PUT (full replace)
+async function saveTicket(ticket) {
+  const res = await fetch(`${FIREBASE_URL}/registrations.json`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(ticket)
+  });
+  if (!res.ok) throw new Error('Firebase save failed');
+  return res;
 }
 
 function increaseQty(type) { if (type === 'drinks') data.qtyDrinks++; else data.qtyEntry++; updateUI(); }
@@ -192,42 +225,122 @@ function updateStats() {
 function showMsg(el, msg) {
   document.getElementById(el).textContent = msg;
   document.getElementById(el).classList.add('show');
-  setTimeout(() => document.getElementById(el).classList.remove('show'), 5000);
+  setTimeout(() => document.getElementById(el).classList.remove('show'), 6000);
 }
 
-function askPassword() {
+function hideMsg(el) {
+  document.getElementById(el).classList.remove('show');
+}
+
+// Bug fix #5: Compare against hash, not plaintext
+async function askPassword() {
   const pwd = prompt('הזן סיסמה');
-  if (pwd === ADMIN_PASSWORD) openModal();
-  else if (pwd !== null) alert('סיסמה שגויה');
+  if (pwd === null) return;
+  const hashed = await hashPassword(pwd);
+  if (hashed === ADMIN_HASH) {
+    await loadData(); // Refresh data when opening admin
+    openModal();
+  } else {
+    alert('סיסמה שגויה');
+  }
 }
 
 function openModal() { document.getElementById('adminModal').classList.add('show'); updateStats(); }
 function closeModal() { document.getElementById('adminModal').classList.remove('show'); }
 
 async function buyTickets() {
+  // Bug fix #10: Prevent double submission
+  if (isSubmitting) return;
+
   const name = document.getElementById('nameInput').value.trim();
   const phone = document.getElementById('phoneInput').value.trim();
+
   if (!name) { showMsg('errorMsg', 'הזן שם'); return; }
   if (!phone) { showMsg('errorMsg', 'הזן טלפון'); return; }
   if (data.qtyDrinks === 0 && data.qtyEntry === 0) { showMsg('errorMsg', 'בחר כרטיסים'); return; }
-  const totalQty = data.qtyDrinks + data.qtyEntry;
-  if (data.registrations.length + totalQty > MAX_TICKETS) { showMsg('errorMsg', 'אין מספיק כרטיסים'); return; }
-  for (let i = 0; i < data.qtyDrinks; i++) data.registrations.push({ name, phone, type: 'drinks', price: 120, time: new Date().toISOString() });
-  for (let i = 0; i < data.qtyEntry; i++) data.registrations.push({ name, phone, type: 'entry', price: 80, time: new Date().toISOString() });
-  await saveData();
-  showMsg('successMsg', `✅ ${totalQty} כרטיסים נקנו!`);
-  document.getElementById('nameInput').value = '';
-  document.getElementById('phoneInput').value = '';
-  data.qtyDrinks = 0;
-  data.qtyEntry = 0;
-  updateUI();
-  setTimeout(() => { window.location.href = 'https://links.payboxapp.com/UibbqwiWR2b'; }, 1500);
+
+  // Bug fix #13: Warn if phone already registered
+  const duplicate = data.registrations.find(r => r.phone === phone);
+  if (duplicate) {
+    showMsg('warningMsg', `⚠️ מספר הטלפון ${phone} כבר רשום! אם זו טעות, המשך.`);
+    // Don't block - just warn. Give 3 seconds to cancel.
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    hideMsg('warningMsg');
+  }
+
+  // Bug fix #10: Disable button
+  isSubmitting = true;
+  const btn = document.getElementById('buyBtn');
+  btn.disabled = true;
+  btn.textContent = 'שומר...';
+
+  try {
+    // Bug fix #9 + #4: Fetch LIVE count from Firebase right before saving
+    const freshRes = await fetch(`${FIREBASE_URL}/registrations.json`);
+    if (!freshRes.ok) throw new Error('לא ניתן לאמת מקום פנוי - נסה שוב');
+    const freshRaw = await freshRes.json();
+    const freshRegs = freshRaw ? Object.values(freshRaw) : [];
+    const totalQty = data.qtyDrinks + data.qtyEntry;
+
+    // Bug fix #9: Check against LIVE count, not stale local count
+    if (freshRegs.length + totalQty > MAX_TICKETS) {
+      const remaining = MAX_TICKETS - freshRegs.length;
+      if (remaining <= 0) {
+        showMsg('errorMsg', 'מצטערים, כל הכרטיסים נמכרו!');
+        data.registrations = freshRegs;
+        updateUI();
+        return;
+      }
+      showMsg('errorMsg', `נשארו רק ${remaining} כרטיסים!`);
+      return;
+    }
+
+    // Bug fix #4: POST each ticket individually (atomic append)
+    const timestamp = new Date().toISOString();
+    const savePromises = [];
+    for (let i = 0; i < data.qtyDrinks; i++) {
+      savePromises.push(saveTicket({ name, phone, type: 'drinks', price: 120, time: timestamp }));
+    }
+    for (let i = 0; i < data.qtyEntry; i++) {
+      savePromises.push(saveTicket({ name, phone, type: 'entry', price: 80, time: timestamp }));
+    }
+    await Promise.all(savePromises);
+
+    // Update local backup
+    for (let i = 0; i < data.qtyDrinks; i++) data.registrations.push({ name, phone, type: 'drinks', price: 120, time: timestamp });
+    for (let i = 0; i < data.qtyEntry; i++) data.registrations.push({ name, phone, type: 'entry', price: 80, time: timestamp });
+    localStorage.setItem('tickets', JSON.stringify(data.registrations));
+
+    showMsg('successMsg', `✅ ${totalQty} כרטיסים נרשמו! מועבר לתשלום...`);
+    document.getElementById('nameInput').value = '';
+    document.getElementById('phoneInput').value = '';
+    data.qtyDrinks = 0;
+    data.qtyEntry = 0;
+    updateUI();
+
+    setTimeout(() => {
+      window.location.href = 'https://links.payboxapp.com/UibbqwiWR2b';
+    }, 2000);
+
+  } catch (e) {
+    // Bug fix #7: Show clear error if Firebase is down
+    showMsg('errorMsg', `שגיאה: ${e.message || 'בעיה בחיבור לשרת. נסה שוב.'}`);
+    btn.disabled = false;
+    btn.textContent = `תשלום ₪${(data.qtyDrinks * 120) + (data.qtyEntry * 80)}`;
+  } finally {
+    isSubmitting = false;
+  }
 }
 
 function downloadExcel() {
   const rows = [
     ['שם', 'טלפון', 'סוג', 'מחיר', 'תאריך'],
-    ...data.registrations.map(r => [r.name, r.phone, r.type === 'drinks' ? 'משקאות' : 'כניסה', '₪' + r.price, new Date(r.time).toLocaleString('he-IL')])
+    ...data.registrations.map(r => [
+      r.name, r.phone,
+      r.type === 'drinks' ? 'משקאות' : 'כניסה',
+      '₪' + r.price,
+      new Date(r.time).toLocaleString('he-IL')
+    ])
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 18 }];
@@ -236,12 +349,21 @@ function downloadExcel() {
   XLSX.writeFile(wb, 'party-tickets.xlsx');
 }
 
-function resetAll() {
-  if (confirm('מחק את כל הנתונים?')) {
+// Bug fix #18: Require typing "מחק" to confirm reset
+async function resetAll() {
+  const confirm1 = prompt('כדי למחוק את כל הנתונים, הקלד "מחק"');
+  if (confirm1 !== 'מחק') {
+    alert('איפוס בוטל');
+    return;
+  }
+  try {
+    await fetch(`${FIREBASE_URL}/registrations.json`, { method: 'DELETE' });
     data.registrations = [];
-    saveData();
+    localStorage.removeItem('tickets');
     updateStats();
     showMsg('successMsg', 'נתונים נמחקו');
+  } catch (e) {
+    alert('שגיאה במחיקה - נסה שוב');
   }
 }
 
