@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>קניית כרטיסים - חוגגים את החיים</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; direction: rtl; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .lock-btn { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.2); border: none; color: white; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; z-index: 1000; transition: all 0.2s; }
+    .lock-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.3); }
+    .card { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+    h1 { color: #333; text-align: center; margin-bottom: 8px; font-size: 32px; }
+    .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 15px; }
+    .sold-out-banner { background: #ffebee; border: 2px solid #d32f2f; color: #d32f2f; padding: 20px; border-radius: 10px; text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; display: none; }
+    .sold-out-banner.show { display: block; }
+    .tickets-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
+    .ticket-btn { padding: 20px; border: 2px solid #e0e0e0; background: white; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; text-align: center; }
+    .ticket-btn:hover { border-color: #667eea; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2); }
+    .ticket-price { font-size: 28px; font-weight: bold; color: #667eea; margin-bottom: 8px; }
+    .ticket-desc { font-size: 13px; color: #666; line-height: 1.4; }
+    .selected-display { text-align: center; color: #667eea; font-weight: bold; margin-bottom: 25px; font-size: 16px; display: none; }
+    .selected-display.show { display: block; }
+    .form-field { margin-bottom: 18px; }
+    label { display: block; color: #333; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
+    input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 16px; direction: rtl; }
+    input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    .qty-control { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 10px; }
+    .qty-btn { width: 40px; height: 40px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-size: 18px; transition: all 0.2s; }
+    .qty-btn:active { border-color: #667eea; color: #667eea; }
+    .qty-display { min-width: 45px; text-align: center; font-weight: bold; font-size: 18px; color: #333; }
+    .submit-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: 25px; transition: all 0.3s; }
+    .submit-btn:active:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .message { padding: 12px; border-radius: 8px; margin-bottom: 20px; display: none; font-size: 14px; }
+    .error { background: #ffebee; color: #d32f2f; border: 1px solid #ef5350; }
+    .success { background: #e8f5e9; color: #2e7d32; border: 1px solid #66bb6a; }
+    .message.show { display: block; }
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; }
+    .modal.show { display: flex; }
+    .modal-box { background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; max-height: 85vh; overflow-y: auto; direction: rtl; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+    .modal-title { color: #333; font-size: 22px; font-weight: bold; }
+    .close-btn { background: none; border: none; font-size: 28px; color: #999; cursor: pointer; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
+    .stat { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+    .stat-label { color: #666; font-size: 12px; margin-bottom: 6px; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #333; }
+    .registrations { margin-bottom: 25px; }
+    .registrations-title { color: #333; font-weight: bold; margin-bottom: 12px; }
+    .reg-item { background: #f8f9fa; padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 13px; color: #333; }
+    .reg-type { color: #667eea; font-weight: bold; }
+    .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; }
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .btn-primary:active { transform: translateY(-1px); }
+    .btn-secondary { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
+    .btn-secondary:active { background: #efefef; }
+    .empty-msg { color: #999; text-align: center; font-size: 13px; padding: 20px; }
+  </style>
+</head>
+<body>
+<button class="lock-btn" onclick="askPassword()">🔐</button>
+<div class="container">
+  <div class="card">
+    <h1>🎉 קניית כרטיסים</h1>
+    <p class="subtitle">בחר כרטיסים וספק פרטים</p>
+    <div id="soldOutBanner" class="sold-out-banner">סוגרים מכירות! 🎊<br>כל 90 כרטיסים נמכרו</div>
+    <div id="formArea" style="display:block;">
+      <div id="errorMsg" class="message error"></div>
+      <div id="successMsg" class="message success"></div>
+      <div class="tickets-container">
+        <div style="border: 2px solid #e0e0e0; border-radius: 10px; padding: 18px; text-align: center;">
+          <div class="ticket-price">₪120</div>
+          <div class="ticket-desc" style="margin-bottom: 15px;">משקאות חינם + כניסה</div>
+          <div class="qty-control">
+            <button class="qty-btn" onclick="decreaseQty('drinks')">−</button>
+            <div class="qty-display" id="qtyDrinks">0</div>
+            <button class="qty-btn" onclick="increaseQty('drinks')">+</button>
+          </div>
+        </div>
+        <div style="border: 2px solid #e0e0e0; border-radius: 10px; padding: 18px; text-align: center;">
+          <div class="ticket-price">₪80</div>
+          <div class="ticket-desc" style="margin-bottom: 15px;">כרטיס כניסה</div>
+          <div class="qty-control">
+            <button class="qty-btn" onclick="decreaseQty('entry')">−</button>
+            <div class="qty-display" id="qtyEntry">0</div>
+            <button class="qty-btn" onclick="increaseQty('entry')">+</button>
+          </div>
+        </div>
+      </div>
+      <div id="selectedDisplay" class="selected-display"></div>
+      <div class="form-field">
+        <label>שם מלא</label>
+        <input type="text" id="nameInput" placeholder="הזן את שמך">
+      </div>
+      <div class="form-field">
+        <label>מספר טלפון</label>
+        <input type="tel" id="phoneInput" placeholder="0501234567">
+      </div>
+      <button class="submit-btn" onclick="buyTickets()" id="buyBtn">בחר כרטיסים</button>
+    </div>
+  </div>
+</div>
+<div id="adminModal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">🔑 פנל ניהול</div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">סה"כ כרטיסים</div><div class="stat-value" id="statTotal">0</div></div>
+      <div class="stat"><div class="stat-label">סכום כולל</div><div class="stat-value" id="statRevenue">₪0</div></div>
+      <div class="stat"><div class="stat-label">משקאות</div><div class="stat-value" id="statDrinks">0</div></div>
+      <div class="stat"><div class="stat-label">כניסה</div><div class="stat-value" id="statEntry">0</div></div>
+    </div>
+    <div class="registrations">
+      <div class="registrations-title">הרשומים</div>
+      <div id="regList"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn btn-primary" onclick="downloadExcel()">📊 הורד Excel</button>
+      <button class="modal-btn btn-secondary" onclick="resetAll()">🔄 איפוס</button>
+    </div>
+  </div>
+</div>
+<script>
+const ADMIN_PASSWORD = '8074345Nw!';
+const MAX_TICKETS = 90;
+const FIREBASE_URL = 'https://lanedefense-analytics-default-rtdb.firebaseio.com/party-tickets';
+let data = { qtyDrinks: 0, qtyEntry: 0, registrations: [] };
+async function init() { await loadData(); updateUI(); }
+async function loadData() {
+  try {
+    const res = await fetch(`${FIREBASE_URL}/registrations.json`);
+    if (res.ok) data.registrations = await res.json() || [];
+  } catch (e) {
+    const stored = localStorage.getItem('tickets');
+    if (stored) data.registrations = JSON.parse(stored);
+  }
+}
+async function saveData() {
+  localStorage.setItem('tickets', JSON.stringify(data.registrations));
+  try {
+    await fetch(`${FIREBASE_URL}/registrations.json`, { method: 'PUT', body: JSON.stringify(data.registrations) });
+  } catch (e) { console.log('Saved locally'); }
+}
+function increaseQty(type) { if (type === 'drinks') data.qtyDrinks++; else data.qtyEntry++; updateUI(); }
+function decreaseQty(type) { if (type === 'drinks' && data.qtyDrinks > 0) data.qtyDrinks--; else if (type === 'entry' && data.qtyEntry > 0) data.qtyEntry--; updateUI(); }
+function updateUI() {
+  const total = data.registrations.length;
+  const isSoldOut = total >= MAX_TICKETS;
+  document.getElementById('soldOutBanner').classList.toggle('show', isSoldOut);
+  document.getElementById('formArea').style.display = isSoldOut ? 'none' : 'block';
+  document.getElementById('qtyDrinks').textContent = data.qtyDrinks;
+  document.getElementById('qtyEntry').textContent = data.qtyEntry;
+  const drinksTotal = data.qtyDrinks * 120;
+  const entryTotal = data.qtyEntry * 80;
+  const grandTotal = drinksTotal + entryTotal;
+  if (data.qtyDrinks > 0 || data.qtyEntry > 0) {
+    let display = '';
+    if (data.qtyDrinks > 0) display += `משקאות: ${data.qtyDrinks} × ₪120 = ₪${drinksTotal}<br>`;
+    if (data.qtyEntry > 0) display += `כניסה: ${data.qtyEntry} × ₪80 = ₪${entryTotal}<br>`;
+    display += `<strong>סה"כ: ₪${grandTotal}</strong>`;
+    document.getElementById('selectedDisplay').innerHTML = display;
+    document.getElementById('selectedDisplay').classList.add('show');
+    document.getElementById('buyBtn').textContent = `תשלום ₪${grandTotal}`;
+  } else {
+    document.getElementById('selectedDisplay').classList.remove('show');
+    document.getElementById('buyBtn').textContent = 'בחר כרטיסים';
+  }
+  updateStats();
+}
+function updateStats() {
+  const total = data.registrations.length;
+  const drinks = data.registrations.filter(r => r.type === 'drinks').length;
+  const entry = data.registrations.filter(r => r.type === 'entry').length;
+  const revenue = data.registrations.reduce((s, r) => s + r.price, 0);
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statDrinks').textContent = drinks;
+  document.getElementById('statEntry').textContent = entry;
+  document.getElementById('statRevenue').textContent = '₪' + revenue;
+  const html = data.registrations.map(r => `<div class="reg-item"><strong>${r.name}</strong> | ${r.phone} | <span class="reg-type">${r.type === 'drinks' ? 'משקאות' : 'כניסה'}</span></div>`).join('') || '<div class="empty-msg">אין רשומים עדיין</div>';
+  document.getElementById('regList').innerHTML = html;
+}
+function showMsg(el, msg) { document.getElementById(el).textContent = msg; document.getElementById(el).classList.add('show'); setTimeout(() => document.getElementById(el).classList.remove('show'), 5000); }
+function askPassword() { const pwd = prompt('הזן סיסמה'); if (pwd === ADMIN_PASSWORD) { openModal(); } else if (pwd !== null) { alert('סיסמה שגויה'); } }
+function openModal() { document.getElementById('adminModal').classList.add('show'); updateStats(); }
+function closeModal() { document.getElementById('adminModal').classList.remove('show'); }
+async function buyTickets() {
+  const name = document.getElementById('nameInput').value.trim();
+  const phone = document.getElementById('phoneInput').value.trim();
+  if (!name) { showMsg('errorMsg', 'הזן שם'); return; }
+  if (!phone) { showMsg('errorMsg', 'הזן טלפון'); return; }
+  if (data.qtyDrinks === 0 && data.qtyEntry === 0) { showMsg('errorMsg', 'בחר כרטיסים'); return; }
+  const totalQty = data.qtyDrinks + data.qtyEntry;
+  if (data.registrations.length + totalQty > MAX_TICKETS) { showMsg('errorMsg', 'אין מספיק כרטיסים'); return; }
+  for (let i = 0; i < data.qtyDrinks; i++) { data.registrations.push({ name, phone, type: 'drinks', price: 120, time: new Date().toISOString() }); }
+  for (let i = 0; i < data.qtyEntry; i++) { data.registrations.push({ name, phone, type: 'entry', price: 80, time: new Date().toISOString() }); }
+  await saveData();
+  showMsg('successMsg', `✅ ${totalQty} כרטיסים נקנו!`);
+  document.getElementById('nameInput').value = '';
+  document.getElementById('phoneInput').value = '';
+  data.qtyDrinks = 0;
+  data.qtyEntry = 0;
+  updateUI();
+  setTimeout(() => { window.location.href = 'https://links.payboxapp.com/UibbqwiWR2b'; }, 1500);
+}
+function downloadExcel() {
+  const rows = [['שם', 'טלפון', 'סוג', 'מחיר', 'תאריך'], ...data.registrations.map(r => [r.name, r.phone, r.type === 'drinks' ? 'משקאות' : 'כניסה', '₪' + r.price, new Date(r.time).toLocaleString('he-IL')])];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'כרטיסים');
+  XLSX.writeFile(wb, 'party-tickets.xlsx');
+}
+function resetAll() { if (confirm('מחק את כל הנתונים?')) { data.registrations = []; saveData(); updateStats(); showMsg('successMsg', 'נתונים נמחקו'); } }
+init();
+</script>
+</body>
+</html>
