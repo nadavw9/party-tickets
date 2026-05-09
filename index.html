@@ -132,7 +132,7 @@
 // Bug fix #5: Password stored as SHA-256 hash, not plaintext
 const ADMIN_HASH = 'c6f236269de81742fe4f77bfd80acf7f24c31b39e264720be5324e4a8d0e27c9';
 const MAX_TICKETS = 90;
-const FIREBASE_URL = 'https://lanedefense-analytics-default-rtdb.firebaseio.com/party-tickets';
+const FIREBASE_URL = 'https://party-tickets-33ca9-default-rtdb.firebaseio.com/party-tickets';
 
 let data = { qtyDrinks: 0, qtyEntry: 0, registrations: [] };
 let isSubmitting = false;
@@ -275,11 +275,18 @@ async function buyTickets() {
   btn.textContent = 'שומר...';
 
   try {
-    // Bug fix #9 + #4: Fetch LIVE count from Firebase right before saving
-    const freshRes = await fetch(`${FIREBASE_URL}/registrations.json`);
-    if (!freshRes.ok) throw new Error('לא ניתן לאמת מקום פנוי - נסה שוב');
-    const freshRaw = await freshRes.json();
-    const freshRegs = freshRaw ? Object.values(freshRaw) : [];
+    // Bug fix #9: Fetch LIVE count from Firebase right before saving
+    let freshRegs = [...data.registrations]; // fallback to local
+    try {
+      const freshRes = await fetch(`${FIREBASE_URL}/registrations.json`);
+      if (freshRes.ok) {
+        const freshRaw = await freshRes.json();
+        freshRegs = freshRaw ? Object.values(freshRaw) : [];
+      }
+    } catch (e) {
+      // If we can't verify live count, use local count as fallback
+      console.log('Using local count as fallback');
+    }
     const totalQty = data.qtyDrinks + data.qtyEntry;
 
     // Bug fix #9: Check against LIVE count, not stale local count
