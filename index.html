@@ -17,17 +17,16 @@
     .sold-out-banner { background: #ffebee; border: 2px solid #d32f2f; color: #d32f2f; padding: 20px; border-radius: 10px; text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; display: none; }
     .sold-out-banner.show { display: block; }
     .tickets-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
-    .ticket-btn { padding: 20px; border: 2px solid #e0e0e0; background: white; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; text-align: center; }
-    .ticket-btn:hover { border-color: #667eea; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2); }
+    .ticket-box { border: 2px solid #e0e0e0; border-radius: 10px; padding: 18px; text-align: center; background: white; }
     .ticket-price { font-size: 28px; font-weight: bold; color: #667eea; margin-bottom: 8px; }
-    .ticket-desc { font-size: 13px; color: #666; line-height: 1.4; }
+    .ticket-desc { font-size: 13px; color: #666; line-height: 1.4; margin-bottom: 15px; }
     .selected-display { text-align: center; color: #667eea; font-weight: bold; margin-bottom: 25px; font-size: 16px; display: none; }
     .selected-display.show { display: block; }
     .form-field { margin-bottom: 18px; }
     label { display: block; color: #333; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
     input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 16px; direction: rtl; }
     input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
-    .qty-control { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 10px; }
+    .qty-control { display: flex; gap: 12px; align-items: center; justify-content: center; }
     .qty-btn { width: 40px; height: 40px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-size: 18px; transition: all 0.2s; }
     .qty-btn:active { border-color: #667eea; color: #667eea; }
     .qty-display { min-width: 45px; text-align: center; font-weight: bold; font-size: 18px; color: #333; }
@@ -72,22 +71,22 @@
       <div id="errorMsg" class="message error"></div>
       <div id="successMsg" class="message success"></div>
       <div class="tickets-container">
-        <div style="border: 2px solid #e0e0e0; border-radius: 10px; padding: 18px; text-align: center;">
-          <div class="ticket-price">₪120</div>
-          <div class="ticket-desc" style="margin-bottom: 15px;">משקאות חינם + כניסה</div>
-          <div class="qty-control">
-            <button class="qty-btn" onclick="decreaseQty('drinks')">−</button>
-            <div class="qty-display" id="qtyDrinks">0</div>
-            <button class="qty-btn" onclick="increaseQty('drinks')">+</button>
-          </div>
-        </div>
-        <div style="border: 2px solid #e0e0e0; border-radius: 10px; padding: 18px; text-align: center;">
+        <div class="ticket-box">
           <div class="ticket-price">₪80</div>
-          <div class="ticket-desc" style="margin-bottom: 15px;">כרטיס כניסה</div>
+          <div class="ticket-desc">כרטיס כניסה</div>
           <div class="qty-control">
             <button class="qty-btn" onclick="decreaseQty('entry')">−</button>
             <div class="qty-display" id="qtyEntry">0</div>
             <button class="qty-btn" onclick="increaseQty('entry')">+</button>
+          </div>
+        </div>
+        <div class="ticket-box">
+          <div class="ticket-price">₪120</div>
+          <div class="ticket-desc">משקאות חינם + כניסה</div>
+          <div class="qty-control">
+            <button class="qty-btn" onclick="decreaseQty('drinks')">−</button>
+            <div class="qty-display" id="qtyDrinks">0</div>
+            <button class="qty-btn" onclick="increaseQty('drinks')">+</button>
           </div>
         </div>
       </div>
@@ -161,8 +160,8 @@ function updateUI() {
   const grandTotal = drinksTotal + entryTotal;
   if (data.qtyDrinks > 0 || data.qtyEntry > 0) {
     let display = '';
-    if (data.qtyDrinks > 0) display += `משקאות: ${data.qtyDrinks} × ₪120 = ₪${drinksTotal}<br>`;
     if (data.qtyEntry > 0) display += `כניסה: ${data.qtyEntry} × ₪80 = ₪${entryTotal}<br>`;
+    if (data.qtyDrinks > 0) display += `משקאות: ${data.qtyDrinks} × ₪120 = ₪${drinksTotal}<br>`;
     display += `<strong>סה"כ: ₪${grandTotal}</strong>`;
     document.getElementById('selectedDisplay').innerHTML = display;
     document.getElementById('selectedDisplay').classList.add('show');
