@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מערכת קניית כרטיסים</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      direction: rtl;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    .admin-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid white;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      z-index: 1000;
+    }
+    
+    .admin-btn:hover {
+      background: rgba(255,255,255,0.3);
+    }
+    
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .ticket-counter {
+      text-align: center;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    
+    .counter-text {
+      color: #666;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .counter-number {
+      font-size: 36px;
+      font-weight: bold;
+      color: #667eea;
+    }
+    
+    .counter-max {
+      color: #999;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    
+    .sold-out {
+      padding: 30px 20px;
+      text-align: center;
+      color: #d32f2f;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .ticket-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    
+    .ticket-card {
+      padding: 20px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .ticket-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+    
+    .ticket-card.selected {
+      border-color: #667eea;
+      background: #f3f4ff;
+    }
+    
+    .ticket-price {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 8px;
+    }
+    
+    .ticket-description {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      color: #333;
+      margin-bottom: 8px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      direction: rtl;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .quantity-selector {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+    }
+    
+    .qty-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    
+    .qty-btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+    
+    .qty-display {
+      min-width: 40px;
+      text-align: center;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 20px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .error {
+      background: #ffebee;
+      color: #d32f2f;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    
+    .error.show {
+      display: block;
+    }
+    
+    .success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    
+    .success.show {
+      display: block;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal.show {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      direction: rtl;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .modal-header h2 {
+      color: #333;
+      font-size: 20px;
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #999;
+      cursor: pointer;
+    }
+    
+    .admin-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+    
+    .btn-secondary:hover:not(:disabled) {
+      background: #e0e0e0;
+    }
+    
+    .btn-danger {
+      background: #d32f2f;
+      color: white;
+    }
+    
+    .btn-danger:hover:not(:disabled) {
+      background: #b71c1c;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .stat-label {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .registrations-list {
+      margin-top: 20px;
+    }
+    
+    .registration-item {
+      background: #f8f9fa;
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #333;
+    }
+    
+    .registration-item .type {
+      font-weight: bold;
+      color: #667eea;
+    }
+  </style>
+</head>
+<body>
+
+<button class="admin-btn" onclick="openAdmin()">🔑 ניהול</button>
+
+<div class="container">
+  <div class="card">
+    <h1>🎉 קניית כרטיסים</h1>
+    <p class="subtitle">בחר כרטיס וספק פרטים</p>
+    
+    <div class="ticket-counter">
+      <div class="counter-text">כרטיסים שנמכרו</div>
+      <div class="counter-number" id="soldCount">0</div>
+      <div class="counter-max">מתוך 90</div>
+    </div>
+    
+    <div id="soldOut" class="sold-out" style="display:none;">
+      סוגרים מכירות! כל 90 כרטיסים נמכרו 🎊
+    </div>
+    
+    <div id="ticketForm" style="display:block;">
+      <div id="errorMsg" class="error"></div>
+      <div id="successMsg" class="success"></div>
+      
+      <div class="ticket-options">
+        <div class="ticket-card" onclick="selectTicket('drinks')">
+          <div class="ticket-price">₪120</div>
+          <div class="ticket-description">משקאות חינם + כניסה</div>
+        </div>
+        <div class="ticket-card" onclick="selectTicket('entry')">
+          <div class="ticket-price">₪80</div>
+          <div class="ticket-description">כרטיס כניסה</div>
+        </div>
+      </div>
+      
+      <div id="selectedInfo" style="display:none;"></div>
+      
+      <div class="form-group">
+        <label>שם מלא</label>
+        <input type="text" id="name" placeholder="הזן את שמך">
+      </div>
+      
+      <div class="form-group">
+        <label>מספר טלפון</label>
+        <input type="tel" id="phone" placeholder="0501234567">
+      </div>
+      
+      <div class="form-group">
+        <label>כמות כרטיסים</label>
+        <div class="quantity-selector">
+          <button class="qty-btn" onclick="decreaseQty()">−</button>
+          <div class="qty-display" id="qtyDisplay">1</div>
+          <button class="qty-btn" onclick="increaseQty()">+</button>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="processPayment()">
+        <span id="payBtn">בחר כרטיס</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="adminModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>🔑 פנל ניהול</h2>
+      <button class="modal-close" onclick="closeAdmin()">✕</button>
+    </div>
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">סה"כ מכירות</div>
+        <div class="stat-value" id="adminTotal">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">סכום כולל</div>
+        <div class="stat-value" id="adminRevenue">₪0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">משקאות (₪120)</div>
+        <div class="stat-value" id="adminDrinks">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">כניסה (₪80)</div>
+        <div class="stat-value" id="adminEntry">0</div>
+      </div>
+    </div>
+    
+    <div class="registrations-list">
+      <h3 style="margin-bottom: 10px; color: #333;">הרשומים</h3>
+      <div id="adminRegistrations"></div>
+    </div>
+    
+    <div class="admin-controls" style="margin-top: 20px;">
+      <button class="btn btn-primary" onclick="downloadExcel()">📊 הורד Excel</button>
+      <button class="btn btn-secondary" onclick="resetData()">🔄 איפוס</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FIREBASE_URL = 'https://lanedefense-analytics-default-rtdb.firebaseio.com/party-tickets';
+const MAX_TICKETS = 90;
+
+let state = {
+  selectedTicket: null,
+  quantity: 1,
+  registrations: []
+};
+
+// Load data on init
+async function init() {
+  await loadData();
+  updateUI();
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(`${FIREBASE_URL}/registrations.json`);
+    if (res.ok) {
+      const data = await res.json();
+      state.registrations = data || [];
+    }
+  } catch (e) {
+    console.log('Loading data from local storage');
+    const stored = localStorage.getItem('partyTickets');
+    if (stored) {
+      state.registrations = JSON.parse(stored);
+    }
+  }
+}
+
+async function saveData() {
+  localStorage.setItem('partyTickets', JSON.stringify(state.registrations));
+  try {
+    await fetch(`${FIREBASE_URL}/registrations.json`, {
+      method: 'PUT',
+      body: JSON.stringify(state.registrations)
+    });
+  } catch (e) {
+    console.log('Saved to local storage only');
+  }
+}
+
+function selectTicket(type) {
+  state.selectedTicket = type;
+  updateUI();
+}
+
+function increaseQty() {
+  state.quantity++;
+  updateUI();
+}
+
+function decreaseQty() {
+  if (state.quantity > 1) state.quantity--;
+  updateUI();
+}
+
+function updateUI() {
+  const totalSold = state.registrations.length;
+  document.getElementById('soldCount').textContent = totalSold;
+  
+  const isSoldOut = totalSold >= MAX_TICKETS;
+  document.getElementById('soldOut').style.display = isSoldOut ? 'block' : 'none';
+  document.getElementById('ticketForm').style.display = isSoldOut ? 'none' : 'block';
+  
+  document.querySelectorAll('.ticket-card').forEach(el => el.classList.remove('selected'));
+  if (state.selectedTicket) {
+    document.querySelector(`.ticket-card[onclick*="${state.selectedTicket}"]`).classList.add('selected');
+  }
+  
+  document.getElementById('qtyDisplay').textContent = state.quantity;
+  
+  const ticketNames = { drinks: 'משקאות (₪120)', entry: 'כניסה (₪80)' };
+  const prices = { drinks: 120, entry: 80 };
+  
+  if (state.selectedTicket) {
+    const total = prices[state.selectedTicket] * state.quantity;
+    document.getElementById('selectedInfo').innerHTML = 
+      `<p style="text-align:center; color: #667eea; font-weight:bold; margin-bottom:20px;">
+        ${ticketNames[state.selectedTicket]} × ${state.quantity} = ₪${total}
+      </p>`;
+    document.getElementById('selectedInfo').style.display = 'block';
+    document.getElementById('payBtn').textContent = `תשלום ₪${total}`;
+  } else {
+    document.getElementById('selectedInfo').style.display = 'none';
+    document.getElementById('payBtn').textContent = 'בחר כרטיס';
+  }
+  
+  updateAdminStats();
+}
+
+function updateAdminStats() {
+  const total = state.registrations.length;
+  const drinksCount = state.registrations.filter(r => r.type === 'drinks').length;
+  const entryCount = state.registrations.filter(r => r.type === 'entry').length;
+  const revenue = state.registrations.reduce((sum, r) => sum + r.price, 0);
+  
+  document.getElementById('adminTotal').textContent = total;
+  document.getElementById('adminDrinks').textContent = drinksCount;
+  document.getElementById('adminEntry').textContent = entryCount;
+  document.getElementById('adminRevenue').textContent = '₪' + revenue;
+  
+  const html = state.registrations.map(r => 
+    `<div class="registration-item">
+      <strong>${r.name}</strong> | ${r.phone} | <span class="type">${r.type === 'drinks' ? 'משקאות' : 'כניסה'}</span>
+    </div>`
+  ).join('');
+  document.getElementById('adminRegistrations').innerHTML = html || '<p style="color:#999;">אין רשומים עדיין</p>';
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('successMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+async function processPayment() {
+  const name = document.getElementById('name').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  
+  if (!name) {
+    showError('הזן שם');
+    return;
+  }
+  if (!phone) {
+    showError('הזן מספר טלפון');
+    return;
+  }
+  if (!state.selectedTicket) {
+    showError('בחר סוג כרטיס');
+    return;
+  }
+  
+  const prices = { drinks: 120, entry: 80 };
+  const total = prices[state.selectedTicket] * state.quantity;
+  
+  // Save registration first
+  for (let i = 0; i < state.quantity; i++) {
+    state.registrations.push({
+      name,
+      phone,
+      type: state.selectedTicket,
+      price: prices[state.selectedTicket],
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  await saveData();
+  
+  showSuccess(`✅ תשלום בהצלחה! ${state.quantity} כרטיסים נקנו`);
+  
+  // Redirect to PayBox
+  window.location.href = 'https://links.payboxapp.com/UibbqwiWR2b';
+  
+  // Clear form
+  document.getElementById('name').value = '';
+  document.getElementById('phone').value = '';
+  state.quantity = 1;
+  state.selectedTicket = null;
+  updateUI();
+}
+
+function openAdmin() {
+  document.getElementById('adminModal').classList.add('show');
+}
+
+function closeAdmin() {
+  document.getElementById('adminModal').classList.remove('show');
+}
+
+function downloadExcel() {
+  const data = [
+    ['שם', 'טלפון', 'סוג כרטיס', 'מחיר', 'תאריך'],
+    ...state.registrations.map(r => [
+      r.name,
+      r.phone,
+      r.type === 'drinks' ? 'משקאות חינם' : 'כניסה',
+      '₪' + r.price,
+      new Date(r.timestamp).toLocaleString('he-IL')
+    ])
+  ];
+  
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 8 }, { wch: 20 }];
+  
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'כרטיסים');
+  XLSX.writeFile(wb, 'party-tickets.xlsx');
+}
+
+function resetData() {
+  if (confirm('האם אתה בטוח? זה מחק את כל הנתונים')) {
+    state.registrations = [];
+    saveData();
+    updateUI();
+    showSuccess('נתונים נמחקו');
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
